@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  # ─── PostgreSQL Database ──────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: xcreener2-db
+    environment:
+      POSTGRES_USER: xcreener
+      POSTGRES_PASSWORD: xcreener2025
+      POSTGRES_DB: xcreener2
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xcreener -d xcreener2"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── Backend API ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: xcreener2-api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://xcreener:xcreener2025@postgres:5432/xcreener2
+      DATABASE_URL_SYNC: postgresql+psycopg2://xcreener:xcreener2025@postgres:5432/xcreener2
+    env_file:
+      - ./backend/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+
+  # ─── Frontend ─────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: xcreener2-web
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

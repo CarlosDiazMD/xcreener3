@@ -156,12 +156,15 @@ async def update_profile(
 async def test_telegram(user: User = Depends(get_user_from_token)):
     """Send a test message to the user's Telegram."""
     if not user.telegram_chat_id:
-        raise HTTPException(status_code=400, detail="Telegram chat ID not configured")
+        raise HTTPException(
+            status_code=400,
+            detail="No Telegram Chat ID configured. Go to Settings and save your Chat ID first.",
+        )
 
     from app.services.alerts import alert_service
-    success = await alert_service.send_test_message(user.telegram_chat_id)
+    success, error = await alert_service.send_test_message(user.telegram_chat_id)
 
     if success:
         return {"status": "ok", "message": "Test message sent"}
     else:
-        raise HTTPException(status_code=500, detail="Failed to send test message")
+        raise HTTPException(status_code=400, detail=error or "Failed to send test message")

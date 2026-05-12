@@ -92,10 +92,13 @@ class AlertService:
 
             await session.commit()
 
-    async def send_test_message(self, chat_id: str, message: str = None) -> bool:
-        """Send a test message to verify Telegram connection."""
+    async def send_test_message(self, chat_id: str, message: str = None) -> tuple[bool, str | None]:
+        """Send a test message to verify Telegram connection.
+        
+        Returns (success, error_message).
+        """
         if not self.bot:
-            return False
+            return False, "Telegram bot token not configured on the server."
         try:
             msg = message or "✅ <b>Xcreener 2.0</b>\n\nTelegram connection verified!"
             await self.bot.send_message(
@@ -103,10 +106,24 @@ class AlertService:
                 text=msg,
                 parse_mode=ParseMode.HTML,
             )
-            return True
+            return True, None
         except Exception as e:
-            logger.error(f"Failed to send test message: {e}")
-            return False
+            logger.error(f"Failed to send test message to {chat_id}: {e}")
+            error_str = str(e)
+            # Translate common Telegram errors to user-friendly messages
+            if "Forbidden" in error_str or "bot can't initiate" in error_str:
+                return False, (
+                    "The bot cannot send messages to this user. "
+                    "The user must first open the bot on Telegram and send /start."
+                )
+            if "chat not found" in error_str.lower():
+                return False, (
+                    "Chat ID not found. Please verify the Chat ID is correct. "
+                    "Send /start to @userinfobot on Telegram to get your ID."
+                )
+            if "user is deactivated" in error_str.lower():
+                return False, "This Telegram account appears to be deactivated."
+            return False, f"Telegram error: {error_str}"
 
     def _format_signal_summary(self, signals: List[Dict], timeframe: str) -> str:
         """Format signals into a Telegram-friendly message."""
